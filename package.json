@@ -1,0 +1,10 @@
+{
+  "name": "support-triage-agent-showcase",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Recruiter-facing interactive showcase for Support Triage Agent",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "dev": "node scripts/site-dev.mjs"
+  }
+}

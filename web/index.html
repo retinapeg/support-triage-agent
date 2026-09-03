@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Choose a synthetic technical support ticket, question the customer, inspect evidence and make the call." />
+    <meta property="og:title" content="Support Triage Agent" />
+    <meta property="og:description" content="An interactive Technical Support Engineer simulation for triage, discovery and evidence-led resolution." />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#07111f" />
+    <title>Support Triage Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <button class="brand" id="home-button" type="button" aria-label="Return to ticket menu">
+        <span class="brand-mark" aria-hidden="true">ST</span>
+        <span>
+          <strong>Support Triage Agent</strong>
+          <small>Technical Engineer · Triage &amp; Discovery</small>
+        </span>
+      </button>
+      <div class="header-actions">
+        <span class="synthetic-label"><i></i> Synthetic training environment</span>
+        <a href="https://github.com/retinapeg/support-triage-agent" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main>
+      <section class="ticket-menu" id="ticket-menu" aria-labelledby="ticket-menu-title">
+        <div class="menu-heading">
+          <div>
+            <p class="eyebrow">Prebuilt scenarios</p>
+            <h1 id="ticket-menu-title">Choose a support ticket</h1>
+            <p>Each scenario tests a different technical boundary. Pick one to begin the customer conversation.</p>
+          </div>
+          <div class="menu-counter">
+            <strong>3</strong>
+            <span>open tickets</span>
+          </div>
+        </div>
+
+        <ol class="journey" aria-label="Simulation flow">
+          <li><span>1</span><strong>Choose</strong><small>Select a ticket</small></li>
+          <li><span>2</span><strong>Discover</strong><small>Question the customer</small></li>
+          <li><span>3</span><strong>Diagnose</strong><small>Inspect evidence</small></li>
+          <li><span>4</span><strong>Resolve</strong><small>Make the call</small></li>
+        </ol>
+
+        <div class="scenario-grid" id="scenario-grid"></div>
+
+        <aside class="about-strip">
+          <div>
+            <strong>What this demonstrates</strong>
+            <span>API troubleshooting · evidence-led decisions · customer communication · safe escalation</span>
+          </div>
+          <div>
+            <strong>Under the hood</strong>
+            <span>Python agent loop · Pydantic contracts · fixture-backed tools · 66 automated tests</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="case-room" id="case-room" hidden aria-labelledby="case-title">
+        <div class="case-room-toolbar">
+          <button class="back-button" id="back-to-tickets" type="button"><span aria-hidden="true">←</span> All tickets</button>
+          <p><strong>How to play:</strong> choose one action or write your own reply. Weak decisions have consequences, but the case stays recoverable.</p>
+        </div>
+
+        <div class="app-shell">
+          <aside class="queue-panel" aria-labelledby="queue-title">
+            <div class="panel-heading">
+              <div>
+                <span class="mini-label">Ticket menu</span>
+                <h2 id="queue-title">Open queue</h2>
+              </div>
+              <span class="queue-count" id="queue-count">3</span>
+            </div>
+            <div id="case-list" class="case-list" role="list"></div>
+            <p class="safe-note"><span aria-hidden="true">◈</span> All companies, people, IDs, endpoints and logs are synthetic.</p>
+          </aside>
+
+          <section class="case-workspace" aria-live="polite">
+            <div class="case-topbar">
+              <div>
+                <div class="case-kicker">
+                  <span id="case-priority">P1</span>
+                  <span id="case-category">Webhook</span>
+                  <span id="case-difficulty">Intermediate</span>
+                </div>
+                <h2 id="case-title">Payment webhooks not appearing</h2>
+                <p id="case-company">Aperture Finance · Jamie Okafor, Platform Operations Lead</p>
+              </div>
+              <button class="icon-button" id="reset-case" type="button" aria-label="Reset current case" title="Reset current case">↻</button>
+            </div>
+
+            <div class="scoreboard" aria-label="Current simulation state">
+              <div><span>Stage</span><strong id="phase-value">1 · Discover</strong></div>
+              <div><span>Score</span><strong id="score-value">0/100</strong></div>
+              <div><span>Customer</span><strong id="mood-value">Concerned</strong></div>
+              <div><span>SLA</span><strong class="sla-value" id="sla-value">14:31</strong></div>
+            </div>
+
+            <ol class="phase-track" aria-label="Case progression">
+              <li class="active" data-phase="0"><span>1</span> Discover</li>
+              <li data-phase="1"><span>2</span> Diagnose</li>
+              <li data-phase="2"><span>3</span> Resolve / escalate</li>
+            </ol>
+
+            <div class="work-grid">
+              <div class="conversation-panel">
+                <div class="subheading">
+                  <div><span class="mini-label">Customer conversation</span><h3>Question the customer</h3></div>
+                  <span class="typing-indicator" id="typing-indicator" hidden><i></i><i></i><i></i> typing</span>
+                </div>
+                <div class="messages" id="messages"></div>
+              </div>
+
+              <aside class="evidence-panel">
+                <div class="subheading"><div><span class="mini-label">Case context</span><h3>Known evidence</h3></div></div>
+                <dl class="case-facts">
+                  <div><dt>Current objective</dt><dd id="objective-value"></dd></div>
+                  <div><dt>Customer tone</dt><dd id="tone-value"></dd></div>
+                </dl>
+                <div class="evidence-box">
+                  <div class="evidence-title"><span>›_</span> Diagnostic evidence</div>
+                  <pre id="evidence-json">{
+  "status": "awaiting discovery"
+}</pre>
+                </div>
+                <div class="boundary-callout"><strong>Trust boundary</strong><span id="boundary-value">Ask for non-secret correlation evidence before diagnosing.</span></div>
+              </aside>
+            </div>
+
+            <section class="decision-panel" aria-labelledby="action-title">
+              <div class="decision-heading">
+                <div><span class="mini-label" id="decision-stage">Your next action</span><h3 id="action-title">What do you do first?</h3></div>
+                <span class="attempt-label" id="attempt-label">Attempt 1</span>
+              </div>
+              <div class="feedback" id="feedback" hidden></div>
+              <div class="action-list" id="action-list"></div>
+
+              <details class="custom-reply-panel">
+                <summary>Write your own customer reply</summary>
+                <form class="reply-form" id="reply-form">
+                  <label for="custom-reply">Your response</label>
+                  <div class="reply-row">
+                    <textarea id="custom-reply" rows="2" placeholder="Acknowledge the impact, then ask for the evidence you need…"></textarea>
+                    <button class="send-button" type="submit">Send <span aria-hidden="true">↗</span></button>
+                  </div>
+                  <p>The browser demo uses transparent keyword scoring. The full local app supports an optional OpenAI customer.</p>
+                </form>
+              </details>
+            </section>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer><span>Support Triage Agent</span><span>Interactive portfolio project · synthetic data only</span></footer>
+  </body>
+</html>

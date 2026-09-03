@@ -58,6 +58,21 @@ project. Live mode may incur API usage. Use synthetic content only.
 
 The role framing is deliberate, but the product remains an independent synthetic portfolio demonstration. It is not connected to Alloy, Zendesk, a bank, or any live customer system.
 
+## Run the compact browser showcase
+
+The repository also includes a credential-free web showcase designed for a
+quick portfolio walkthrough. It opens on a ticket menu with three prebuilt
+scenarios, then moves into the same discovery → diagnosis → resolution flow.
+
+```bash
+npm run dev
+```
+
+Open `http://127.0.0.1:4173`. No package installation or API key is required.
+The browser showcase uses synthetic scenario data and transparent keyword
+scoring for typed replies; the Streamlit app above remains the full Python
+simulation with optional OpenAI customer interactions.
+
 ## Command-line demo
 
 Run all three scenarios without the UI:
