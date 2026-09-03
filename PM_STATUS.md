@@ -20,7 +20,7 @@
 
 ## CURRENT BLOCKER
 
-- GitHub publication is waiting for the user to refresh the expired `retinapeg` GitHub CLI login.
+- None.
 
 ## NEXT ACTION
 
@@ -30,8 +30,8 @@
 
 - The current OpenAI SDK is installed and the structured-output integration is wired, but no credential-backed API call was made because no key was handled by Codex.
 - Diagnostics are synthetic and state is in memory; production integrations are intentionally out of scope.
-- The project now has an ordered local Git history but no remote until GitHub authentication is restored.
+- The public GitHub repository is `retinapeg/support-triage-agent`; `main` tracks `origin/main`.
 
 ## RELEASE STATUS
 
-- **LOCAL GO / PUBLISH BLOCKED** — the credential-free interview build is verified; GitHub push awaits login.
+- **GO / PUBLISHED** — the credential-free interview build is verified and the public GitHub repository is live.
