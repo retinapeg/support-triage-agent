@@ -10,12 +10,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "pydantic>=2.6,<3",
+  "openai>=1.68",
+  "streamlit>=1.63,<2",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-openai = ["openai>=1.68"]
-ui = ["streamlit>=1.63,<2"]
+openai = []
+ui = []
 all = ["openai>=1.68", "streamlit>=1.63,<2", "pytest>=8"]
 
 [tool.pytest.ini_options]
@@ -24,4 +26,4 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.setuptools]
-py-modules = ["agent", "demo", "llm", "models", "state", "streamlit_app", "tools"]
+py-modules = ["agent", "demo", "llm", "models", "simulation", "state", "streamlit_app", "tools"]
