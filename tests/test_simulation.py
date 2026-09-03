@@ -1,5 +1,6 @@
 from simulation import (
     CASE_BY_TEMPLATE,
+    CustomerEvaluation,
     MockCustomerSimulator,
     TrainingPhase,
     TrainingSession,
@@ -102,6 +103,36 @@ def test_internal_failure_finishes_as_evidence_backed_escalation() -> None:
     assert session.phase == TrainingPhase.COMPLETE
     assert session.outcome == "Escalated with evidence"
     assert "rules_evaluation" in session.case.resolution
+
+
+class AdvancingCustomer:
+    name = "test-customer"
+
+    def respond(self, session, trainee_message):
+        return CustomerEvaluation(
+            reply="Please explain what the trace shows.",
+            score_delta=20,
+            feedback="The diagnostic choice was relevant.",
+            advance=True,
+            customer_mood="Cooperative",
+        )
+
+
+def test_live_style_free_text_cannot_advance_diagnosis_without_tool_evidence() -> None:
+    session = _session("webhook-endpoint-5xx")
+    session.phase = TrainingPhase.DIAGNOSIS
+
+    submit_free_text(
+        session,
+        "I will trace your event through delivery attempts and endpoint responses.",
+        AdvancingCustomer(),
+    )
+
+    assert session.phase == TrainingPhase.RESPONSE
+    assert len(session.tool_results) == 1
+    assert session.tool_results[0].tool_name == "inspect_webhook_delivery"
+    assert session.tool_results[0].success
+    assert session.events[-2].detail["trigger"] == "free_text_guardrail"
 
 
 def test_score_band_is_clear_at_each_boundary() -> None:

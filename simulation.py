@@ -946,6 +946,7 @@ def generate_live_case(
         deep=True,
         update={
             **generated.model_dump(),
+            "company": f"{generated.company} (synthetic)",
             "case_id": f"case-live-{base_case.template_id}-{uuid4().hex[:6]}",
         },
     )
@@ -962,10 +963,56 @@ def submit_free_text(
     if not message:
         raise ValueError("Write a response before sending it.")
     engine = simulator or MockCustomerSimulator()
+    original_phase = session.phase
     session.conversation.append(
         ConversationMessage(role=ConversationRole.SUPPORT, content=message)
     )
     evaluation = engine.respond(session, message)
+
+    # A language model may judge that the trainee named the right diagnostic,
+    # but only Python can execute it and create operational evidence. Ensure
+    # every diagnosis-to-response transition has a successful tool result.
+    if original_phase == TrainingPhase.DIAGNOSIS and evaluation.advance:
+        already_observed = any(
+            result.tool_name == session.case.diagnostic_tool and result.success
+            for result in session.tool_results
+        )
+        if not already_observed:
+            result = dispatch_tool(
+                session.case.diagnostic_tool,
+                session.case.diagnostic_arguments,
+            )
+            session.tool_results.append(result)
+            session.events.append(
+                SimulationEvent(
+                    event_type="tool_result",
+                    summary=result.summary,
+                    detail={
+                        "tool_name": result.tool_name,
+                        "success": result.success,
+                        "trigger": "free_text_guardrail",
+                    },
+                )
+            )
+            if not result.success:
+                evaluation.advance = False
+                evaluation.feedback = (
+                    "The diagnostic did not return successful evidence, so the case "
+                    "cannot advance to a customer conclusion."
+                )
+
+    if (
+        original_phase == TrainingPhase.RESPONSE
+        and evaluation.advance
+        and not any(result.success for result in session.tool_results)
+    ):
+        evaluation.advance = False
+        evaluation.score_delta = min(0, evaluation.score_delta)
+        evaluation.feedback = (
+            "A final resolution needs successful diagnostic evidence. Run the "
+            "case-specific tool before concluding."
+        )
+
     session.conversation.append(
         ConversationMessage(role=ConversationRole.CUSTOMER, content=evaluation.reply)
     )

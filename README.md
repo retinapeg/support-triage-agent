@@ -1,10 +1,18 @@
 # Support Triage Agent
 
-A small, evidence-led Python agent for technical-support triage. It turns an incomplete customer report into a targeted clarification, supported resolution, or useful engineering escalation.
+An interactive Technical Support Engineer simulation and an inspectable Python
+triage agent. Incoming API and webhook incidents build up in a live queue. The
+trainee accepts a case, talks to a synthetic customer, chooses one of five
+shuffled actions at each stage, runs fixture-backed diagnostics, and receives
+customer reactions, coaching, a score, and an evidence-based outcome.
 
-The default demo is deterministic, offline, and uses only synthetic data. It requires no API credentials and makes no claim to use Alloy APIs, documentation, systems, or customer data.
+Optional **Live AI customer** mode uses OpenAI to generate fresh customer
+wording and react to the trainee's exact messages. The model can change the
+conversation, but it cannot change fixture-backed IDs, logs, HTTP statuses or
+the required resolution. The fully interactive scenario engine remains
+available offline with no credentials.
 
-## Visual interview demo — recommended
+## Run the interactive simulation — recommended
 
 Requires Python 3.10 or newer.
 
@@ -12,10 +20,21 @@ Requires Python 3.10 or newer.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m streamlit run streamlit_app.py
+python -m streamlit run streamlit_app.py --server.port 8503
 ```
 
-Open the local address Streamlit prints, normally `http://localhost:8501`. The visual console is designed for a short interview walkthrough: choose or switch guided cases at any time, show the safe discovery stop, add the bundled customer reply, replay the completed investigation event by event, then inspect the evidence or engineering handoff. Previous, next and re-run controls always create a fresh synthetic case while leaving the three bundled stories unchanged. Mock mode is selected by default and needs no API key.
+Open `http://127.0.0.1:8503`. The console starts with four incoming cases.
+Accept any ticket, then either select one of five possible support actions or
+write your own response in the chat box. Strong discovery reveals the exact
+synthetic identifiers required for diagnosis. The appropriate diagnostic
+returns structured evidence. The final stage tests whether you can explain the
+finding, bound its scope, and own the resolution or engineering escalation.
+
+The queue includes authentication, permissions, rate limiting, webhook,
+idempotency, precondition and internal-error cases. **Auto-arrivals** can add a
+new ticket every 20 seconds while the page is open. Every decision affects the
+support score and customer mood; wrong answers create realistic consequences
+without making the case unrecoverable.
 
 The interface is tailored to the core behaviours of a Technical Support Engineer **Triage & Discovery** workflow:
 
@@ -25,6 +44,17 @@ The interface is tailored to the core behaviours of a Technical Support Engineer
 - keep confirmed facts visibly separate from hypotheses;
 - resolve a standard case only when diagnostic evidence supports it; and
 - give the next engineer a handoff that does not require discovery to start again.
+
+### Enable real AI customer interactions
+
+1. Start the app normally.
+2. In the sidebar, set **Customer engine** to **Live AI customer**.
+3. Paste your OpenAI API key into the password field in the local app—not into
+   source code, GitHub, a screenshot, or this chat.
+4. Click **Generate AI incident**, accept it, and reply normally.
+
+The key is held only in the running Streamlit session and is not written to the
+project. Live mode may incur API usage. Use synthetic content only.
 
 The role framing is deliberate, but the product remains an independent synthetic portfolio demonstration. It is not connected to Alloy, Zendesk, a bank, or any live customer system.
 
@@ -44,7 +74,14 @@ Run the complete test suite:
 python -m pytest -q
 ```
 
-## What the demo shows
+## What the project shows
+
+The UI and autonomous agent demonstrate two complementary loops:
+
+- Interactive training: incoming case → trainee reply or choice → customer
+  reaction → diagnostic evidence → score/state update → next stage → outcome.
+- Autonomous agent: customer issue → decision → tool call → observation →
+  CaseState update → next decision → resolution or escalation.
 
 Each trace makes the loop visible:
 
@@ -58,7 +95,7 @@ customer issue
   -> resolution or escalation
 ```
 
-The three scenarios are:
+The command-line agent includes three repeatable scenarios:
 
 | Scenario | Behaviour | Outcome |
 |---|---|---|
@@ -96,8 +133,9 @@ Mock mode and optional hosted-model mode use the same `AgentDecision`, tool, sta
 | `models.py` | Strict Pydantic contracts for decisions, evidence, tool results, audit events, and escalations |
 | `tools.py` | Synthetic troubleshooting fixtures and allow-listed tool registry |
 | `llm.py` | Replaceable deterministic and OpenAI decision adapters |
+| `simulation.py` | Incoming queue cases, five-choice training loop, customer simulation, scoring, and optional OpenAI customer |
 | `demo.py` | Three repeatable end-to-end scenarios |
-| `streamlit_app.py` | Presenter-friendly Triage & Discovery console over the same agent |
+| `streamlit_app.py` | Interactive support-shift queue, customer chat, SLA, choices, evidence, and scorecard |
 | `tests/` | Behavioural and contract tests |
 
 The deliberately explicit loop is the main design choice: an interviewer can inspect the control flow without learning a large agent framework first.
@@ -133,17 +171,20 @@ create_engineering_escalation(case_state)
 
 An engineering escalation contains impact, symptoms, timestamps, correlation IDs, HTTP codes, relevant evidence, troubleshooting performed, an explicitly qualified likely cause, and outstanding questions.
 
-## Optional hosted-model interface
+## Optional hosted autonomous-agent interface
 
-The optional OpenAI adapter uses the Responses API through the isolated decision interface:
+The visual app's Live AI customer mode is configured in its sidebar. Separately,
+the autonomous CLI agent can use an OpenAI decision adapter through the
+Responses API:
 
 ```bash
-python -m pip install -e '.[openai]'
 export OPENAI_API_KEY="your-key"
 python demo.py --provider openai
 ```
 
-Do not commit or paste API secrets into the app. Hosted mode is nondeterministic, may incur usage, and is not needed for the verified interview demo.
+Do not commit API secrets or paste them into source code, GitHub, screenshots or
+chat. Hosted mode is nondeterministic, may incur usage, and is not needed for
+the verified offline interview flow.
 
 ## Tests
 
@@ -159,21 +200,23 @@ The suite checks that:
 - the maximum-step limit has no off-by-one call;
 - the 401 and webhook paths behave sensibly; and
 - escalation output satisfies the complete typed contract;
-- an active case can switch directly to any other guided scenario without leaking state;
-- previous, next and re-run controls create the correct fresh case; and
-- the interactive completed-trace replay remains available after switching and resuming.
+- every active training stage presents exactly five choices and one strongest action;
+- safe choices progress discovery, diagnosis and response while unsafe choices do not;
+- free-text replies can drive the same fixture-backed diagnostic path;
+- the live queue accepts and adds incidents without leaking case state; and
+- completed cases produce a scorecard and remain recorded in the shift history.
 
 ## Interview explanation
 
 ### 30 seconds
 
-> I built a support-triage agent that turns an incomplete customer report into an evidence-backed resolution, clarification request, or engineering escalation. A decision adapter chooses one action, Python validates and calls a typed diagnostic tool, the observation updates a structured case record, and the loop repeats until an explicit stop. Confirmed evidence is separate from hypotheses, identifiers cannot be invented, every action is auditable, and a hard step limit prevents runaway execution. The included demo is deterministic, credential-free, and entirely synthetic.
+> I built an interactive support-engineering simulator backed by a real triage agent. Incidents arrive in a live queue; I can talk to the customer or choose one of five actions, run fixture-backed diagnostics, and get scored on discovery, evidence use and escalation judgement. Optional OpenAI mode generates fresh customer wording and reacts to what I actually say, but it cannot invent logs or change the underlying case truth. The autonomous agent uses the same typed tools and evidence guardrails to reach an explicit resolution, clarification or engineering handoff.
 
 ### 90 seconds
 
-> The core is a small Python orchestration loop rather than a large framework. A customer report creates a Pydantic `CaseState` containing supplied identifiers, impact, timestamps, confirmed evidence, missing information, hypotheses, actions, and status. On each iteration, a replaceable decision adapter returns one typed action: ask for information, call a diagnostic, resolve, or escalate. The runtime validates that action, enforces identifier provenance, dispatches an allow-listed tool, stores the structured observation, emits an audit event, and passes the updated state into the next decision.
+> The project has two connected loops. In the training loop, a trainee accepts a timed incoming case, writes a customer message or chooses one of five shuffled actions, receives a customer reaction and coaching, runs the appropriate diagnostic, and progresses through discovery, diagnosis and response. In Live AI mode, the Responses API produces structured customer reactions and fresh incident phrasing. The prompt supplies the exact synthetic case truth, and Python keeps identifiers, logs, scores, tools and stage transitions outside the model.
 >
-> The model is treated as a policy layer, not a source of operational truth. Tools provide evidence; possible causes remain hypotheses. A resolution needs supporting diagnostic evidence, while conflicting or incomplete high-impact cases become engineering escalations. The step budget is enforced outside the model. Mock mode exercises the same contracts as the optional hosted adapter, which makes the three interview scenarios and behavioural test suite repeatable without credentials. Production work would replace fixtures with authenticated service adapters and add durable storage, redaction, tenant isolation, timeouts, tracing, and human approval for consequential actions.
+> Separately, the autonomous agent creates a Pydantic `CaseState` and repeatedly asks a replaceable decision adapter for exactly one action: ask, call a tool, resolve or escalate. Python validates identifier provenance, dispatches an allow-listed tool, records the observation and audit event, and supplies the updated state to the next decision. The model is a language and policy layer, never the source of operational truth. A resolution needs supporting evidence; conflicting or high-impact uncertainty becomes an engineering escalation. Production work would replace fixtures with authenticated adapters and add durable storage, tenant isolation, redaction, tracing, timeouts and human approval for consequential writes.
 
 ## Three design decisions to defend
 
@@ -183,16 +226,24 @@ The suite checks that:
 
 ## Likely questions
 
-**Is deterministic mock mode really agentic?**  
-It proves the orchestration: repeated decisions, tool dispatch, observations, state transitions, and stopping. It does not prove a hosted model’s reasoning quality; that needs a labelled evaluation set.
+**Is the offline customer mode really interactive?**
 
-**Why not LangChain or LangGraph?**  
+Yes: the trainee chooses or writes every action, the customer reacts, the score and mood change, diagnostics execute, and the case advances only when the current support objective is met. It is deterministic, however; use Live AI customer mode to demonstrate model-generated language and reactions.
+
+**Is deterministic mock mode really agentic?**
+
+The separate autonomous CLI loop proves repeated decisions, tool dispatch, observations, state transitions, and stopping. It does not prove hosted-model reasoning quality; that needs a labelled evaluation set.
+
+**Why not LangChain or LangGraph?**
+
 For this scope, the hand-written loop exposes more engineering understanding with fewer dependencies. A graph framework becomes useful when persistence, branching workflows, or many integrations justify it.
 
-**How does it reduce hallucination risk?**  
+**How does it reduce hallucination risk?**
+
 Operational facts come from customer input or tool observations, identifier arguments need provenance, hypotheses have their own field, and uncertainty can end in clarification or escalation.
 
-**What would productionisation require?**  
+**What would productionisation require?**
+
 Authenticated adapters, durable event/case storage, tenant isolation, PII and secret redaction, timeouts and circuit breakers, tracing and metrics, evaluation gates, retention controls, and approval boundaries for writes.
 
 ## Limitations
@@ -200,7 +251,9 @@ Authenticated adapters, durable event/case storage, tenant isolation, PII and se
 - Diagnostics and customers are synthetic; there are no live log, status, webhook, or ticketing integrations.
 - Mock mode validates deterministic orchestration, not general reasoning on unseen incidents.
 - State is local and in-memory, not a concurrent or durable case store.
-- The visual UI is a presenter layer over the same in-memory agent, not a production case-management system.
+- The visual UI is an in-memory training simulator, not a production ticketing or case-management system.
+- Live AI mode generates language and coaching, but all operational truth is constrained to synthetic fixtures.
+- The app has no durable user accounts, team scoring, real ticket ingestion, or authenticated production adapters.
 - This is a portfolio architecture, not a production security boundary.
 
 MIT licensed; see `LICENSE`.
