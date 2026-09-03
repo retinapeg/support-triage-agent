@@ -1,11 +1,10 @@
-"""Presenter-path smoke tests for the Streamlit interface."""
+"""Smoke tests for the interactive support-shift interface."""
 
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-from demo import SCENARIOS
-from models import CaseStatus
+from simulation import TrainingPhase, choices_for
 
 
 def _new_app() -> AppTest:
@@ -19,170 +18,146 @@ def _button_by_key(app: AppTest, key: str):
     return next(button for button in app.button if button.key == key)
 
 
-def _button_by_label(app: AppTest, label: str):
-    return next(button for button in app.button if button.label == label)
+def _first_button_with_prefix(app: AppTest, prefix: str):
+    return next(button for button in app.button if (button.key or "").startswith(prefix))
 
 
-def _click_key(app: AppTest, key: str) -> None:
-    _button_by_key(app, key).click()
+def _accept_first_case(app: AppTest) -> None:
+    _first_button_with_prefix(app, "accept_").click()
     app.run()
     assert not app.exception
 
 
-def test_initial_presenter_surface_is_safe_and_scenario_driven() -> None:
-    app = _new_app()
-
-    assert app.selectbox[0].label == "Decision mode"
-    assert app.selectbox[0].value == "mock"
-    assert app.slider[0].label == "Safety step limit"
-    assert app.slider[0].value == 8
-    assert {button.key for button in app.button} >= {
-        "start_scenario_1",
-        "start_scenario_2",
-        "start_scenario_3",
-    }
-    rendered_copy = "\n".join(str(item.value) for item in app.markdown)
-    assert "Synthetic portfolio demo" in rendered_copy
-    assert "Triage &amp; Discovery" in rendered_copy
-
-
-def test_guided_authentication_case_pauses_then_resolves_same_case() -> None:
-    app = _new_app()
-
-    _button_by_key(app, "start_scenario_1").click()
+def _choose_best(app: AppTest) -> None:
+    session = app.session_state["active_training"]
+    best = next(choice for choice in choices_for(session) if choice.is_best)
+    button = next(
+        item
+        for item in app.button
+        if (item.key or "").startswith("choice_")
+        and (item.key or "").endswith(best.choice_id)
+    )
+    button.click()
     app.run()
-
     assert not app.exception
-    waiting_state = app.session_state["case_state"]
-    case_id = waiting_state.case_id
-    assert waiting_state.status == CaseStatus.AWAITING_CUSTOMER
-    assert not waiting_state.evidence
-    assert _button_by_label(app, "▶ Add sample customer evidence and continue")
-
-    _click_key(app, "continue_sample_evidence")
-
-    assert not app.exception
-    resolved_state = app.session_state["case_state"]
-    assert resolved_state.case_id == case_id
-    assert resolved_state.status == CaseStatus.RESOLVED
-    assert len(resolved_state.evidence) == 2
-    metrics = {metric.label: metric.value for metric in app.metric}
-    assert metrics["Issue areas"] == "Authentication + API"
 
 
-def test_escalation_case_exposes_mixed_boundaries_and_downloadable_handoff() -> None:
+def test_initial_surface_is_a_live_queue_not_a_scenario_gallery() -> None:
     app = _new_app()
 
-    _button_by_key(app, "start_scenario_3").click()
-    app.run()
+    assert app.selectbox[0].label == "Customer engine"
+    assert app.selectbox[0].value == "Scenario engine"
+    assert len(app.session_state["incoming_queue"]) == 4
+    assert len(
+        [button for button in app.button if (button.key or "").startswith("accept_")]
+    ) == 4
+    rendered = "\n".join(str(item.value) for item in app.markdown)
+    assert "Support Shift" in rendered
+    assert "Live support queue" in "\n".join(item.value for item in app.subheader)
+    assert "Technical Support Engineer" in rendered
 
-    assert not app.exception
-    state = app.session_state["case_state"]
-    assert state.status == CaseStatus.ESCALATED
-    assert state.escalation is not None
-    metrics = {metric.label: metric.value for metric in app.metric}
-    assert metrics["Issue areas"] == "API + Webhook"
-    assert any(
-        item.label == "Download structured handoff (.json)"
-        for item in app.get("download_button")
+
+def test_accepting_case_opens_customer_chat_and_five_actions() -> None:
+    app = _new_app()
+    initial_queue_size = len(app.session_state["incoming_queue"])
+
+    _accept_first_case(app)
+
+    session = app.session_state["active_training"]
+    assert session.phase == TrainingPhase.DISCOVERY
+    assert len(app.session_state["incoming_queue"]) == initial_queue_size - 1
+    assert len(session.conversation) == 1
+    choice_buttons = [
+        button for button in app.button if (button.key or "").startswith("choice_")
+    ]
+    assert len(choice_buttons) == 5
+    assert len(app.chat_input) == 1
+    assert "Write your discovery response" in app.chat_input[0].placeholder
+
+
+def test_best_answers_drive_case_through_diagnostic_to_scorecard() -> None:
+    app = _new_app()
+    _accept_first_case(app)
+
+    _choose_best(app)
+    session = app.session_state["active_training"]
+    assert session.phase == TrainingPhase.DIAGNOSIS
+    assert session.score == 25
+    assert len(session.conversation) == 3
+
+    _choose_best(app)
+    session = app.session_state["active_training"]
+    assert session.phase == TrainingPhase.RESPONSE
+    assert session.score == 60
+    assert len(session.tool_results) == 1
+    assert session.tool_results[0].success
+
+    _choose_best(app)
+    session = app.session_state["active_training"]
+    assert session.phase == TrainingPhase.COMPLETE
+    assert session.score == 100
+    assert session.outcome is not None
+    assert _button_by_key(app, "complete_to_queue")
+    rendered = "\n".join(str(item.value) for item in app.markdown)
+    assert "score-number\">100" in rendered
+
+
+def test_unsafe_answer_changes_customer_mood_without_advancing() -> None:
+    app = _new_app()
+    _accept_first_case(app)
+    session = app.session_state["active_training"]
+    unsafe = next(choice for choice in choices_for(session) if "API key" in choice.label)
+    unsafe_button = next(
+        item for item in app.button if (item.key or "").endswith(unsafe.choice_id)
     )
 
-    _click_key(app, "clear_case_to_gallery")
-    assert not app.exception
-    assert "case_state" not in app.session_state
-
-
-def test_active_case_can_switch_directly_to_another_guided_scenario() -> None:
-    app = _new_app()
-
-    _click_key(app, "start_scenario_1")
-    first_state = app.session_state["case_state"]
-    first_case_id = first_state.case_id
-
-    assert app.session_state["active_scenario"] == 1
-    assert first_state.status == CaseStatus.AWAITING_CUSTOMER
-    assert {button.key for button in app.button} >= {
-        "switch_scenario_1",
-        "switch_scenario_2",
-        "switch_scenario_3",
-        "scenario_previous",
-        "scenario_rerun",
-        "scenario_next",
-    }
-
-    _click_key(app, "switch_scenario_3")
-
-    switched = app.session_state["case_state"]
-    assert app.session_state["active_scenario"] == 3
-    assert switched.case_id != first_case_id
-    assert switched.customer == SCENARIOS[2].customer
-    assert switched.original_message == SCENARIOS[2].issue
-    assert switched.status == CaseStatus.ESCALATED
-    assert switched.escalation is not None
-    assert switched.resolution is None
-    assert switched.max_steps == 8
-    assert app.session_state["case_provider"] == "mock"
-
-
-def test_previous_next_and_rerun_controls_create_fresh_cases() -> None:
-    app = _new_app()
-
-    _click_key(app, "start_scenario_2")
-    scenario_two_id = app.session_state["case_state"].case_id
-    assert not _button_by_key(app, "scenario_previous").disabled
-    assert not _button_by_key(app, "scenario_next").disabled
-
-    _click_key(app, "scenario_previous")
-    scenario_one = app.session_state["case_state"]
-    assert app.session_state["active_scenario"] == 1
-    assert scenario_one.case_id != scenario_two_id
-    assert scenario_one.original_message == SCENARIOS[0].issue
-    assert scenario_one.status == CaseStatus.AWAITING_CUSTOMER
-    assert _button_by_key(app, "scenario_previous").disabled
-
-    _click_key(app, "continue_sample_evidence")
-    resolved = app.session_state["case_state"]
-    assert resolved.status == CaseStatus.RESOLVED
-    assert len(resolved.evidence) == 2
-
-    _click_key(app, "scenario_rerun")
-    rerun = app.session_state["case_state"]
-    assert app.session_state["active_scenario"] == 1
-    assert rerun.case_id != resolved.case_id
-    assert rerun.status == CaseStatus.AWAITING_CUSTOMER
-    assert len(rerun.customer_messages) == 1
-    assert not rerun.evidence
-    assert rerun.resolution is None
-
-    _click_key(app, "scenario_next")
-    scenario_two = app.session_state["case_state"]
-    assert app.session_state["active_scenario"] == 2
-    assert scenario_two.original_message == SCENARIOS[1].issue
-    assert scenario_two.status == CaseStatus.AWAITING_CUSTOMER
-
-
-def test_switched_scenario_keeps_the_correct_interactive_reply_and_trace_replay() -> None:
-    app = _new_app()
-
-    _click_key(app, "start_scenario_1")
-    abandoned_id = app.session_state["case_state"].case_id
-    _click_key(app, "switch_scenario_2")
-
-    waiting = app.session_state["case_state"]
-    waiting_id = waiting.case_id
-    assert waiting_id != abandoned_id
-    assert waiting.status == CaseStatus.AWAITING_CUSTOMER
-
-    _click_key(app, "continue_sample_evidence")
-    resolved = app.session_state["case_state"]
-    assert resolved.case_id == waiting_id
-    assert resolved.status == CaseStatus.RESOLVED
-    assert resolved.customer_messages[-1] == SCENARIOS[1].followups[0]
-
-    trace_view = next(item for item in app.radio if item.label == "Trace view")
-    trace_view.set_value("Replay one recorded event")
+    unsafe_button.click()
     app.run()
+
+    session = app.session_state["active_training"]
     assert not app.exception
-    replay = next(item for item in app.slider if item.label == "Replay position")
-    assert replay.min == 1
-    assert replay.max > 1
+    assert session.phase == TrainingPhase.DISCOVERY
+    assert session.customer_mood == "Alarmed"
+    assert "cannot share credentials" in session.conversation[-1].content
+    assert len(
+        [button for button in app.button if (button.key or "").startswith("choice_")]
+    ) == 5
+
+
+def test_live_ai_mode_exposes_session_only_key_input_and_generation_control() -> None:
+    app = _new_app()
+
+    app.selectbox[0].set_value("Live AI customer")
+    app.run()
+
+    assert not app.exception
+    assert {item.label for item in app.text_input} >= {"OpenAI API key", "Model"}
+    generate = _button_by_key(app, "generate_ai_incident")
+    assert generate.disabled
+
+
+def test_manual_incoming_control_adds_a_new_ticket() -> None:
+    app = _new_app()
+    before = len(app.session_state["incoming_queue"])
+
+    _button_by_key(app, "add_offline_incident").click()
+    app.run()
+
+    assert not app.exception
+    assert len(app.session_state["incoming_queue"]) == before + 1
+
+
+def test_completed_case_is_recorded_when_returning_to_queue() -> None:
+    app = _new_app()
+    _accept_first_case(app)
+    _choose_best(app)
+    _choose_best(app)
+    _choose_best(app)
+
+    _button_by_key(app, "complete_to_queue").click()
+    app.run()
+
+    assert not app.exception
+    assert app.session_state["active_training"] is None
+    assert len(app.session_state["completed_sessions"]) == 1
+    assert any((button.key or "").startswith("accept_") for button in app.button)
