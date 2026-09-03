@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "support-triage-agent"
+version = "0.1.0"
+description = "An evidence-led, tool-using technical support triage agent"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.6,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+openai = ["openai>=1.68"]
+ui = ["streamlit>=1.63,<2"]
+all = ["openai>=1.68", "streamlit>=1.63,<2", "pytest>=8"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools]
+py-modules = ["agent", "demo", "llm", "models", "state", "streamlit_app", "tools"]
