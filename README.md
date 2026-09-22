@@ -2,7 +2,10 @@
 
 A tool-using triage agent for API and webhook support incidents, plus an
 interactive training simulator that uses the same synthetic diagnostic tools.
-Everything runs offline with no API key; OpenAI is optional.
+Everything runs offline with no API key; OpenAI is optional. In the offline
+demo, driven by the deterministic mock adapter, the agent resolves two of three
+scenarios and escalates the third to engineering
+([results](#result-offline-demo)); all 66 tests pass without a key.
 
 - **Bounded tool loop.** At each step a decision adapter returns exactly one
   `AgentDecision` (ask the customer, call a tool, resolve or escalate). It is a
@@ -91,7 +94,7 @@ change fixture-backed IDs, logs, HTTP statuses or the required resolution.
 The key is held only in the running Streamlit session and is not written to the
 project. Live mode may incur API usage. Use synthetic content only.
 
-All scenarios, customers, identifiers and logs are synthetic. The project is not connected to any ticketing system, bank or live customer system.
+All scenarios, customers, identifiers and logs are synthetic. The project is not connected to any ticketing or live customer system.
 
 ## Browser showcase
 
@@ -250,6 +253,7 @@ the offline demo or the test suite.
 
 - Diagnostics and customers are synthetic; there are no live log, status, webhook, or ticketing integrations.
 - Mock mode validates deterministic orchestration, not general reasoning on unseen incidents.
+- The OpenAI paths (`OpenAIResponsesAdapter` in `llm.py`, and `OpenAICustomerSimulator` and `generate_live_case` in `simulation.py`) are not covered by the test suite, and no live-model results are included; every result in this README comes from the mock adapter.
 - State is local and in-memory, not a concurrent or durable case store.
 - The visual UI is an in-memory training simulator, not a production ticketing or case-management system.
 - Live AI mode generates language and coaching, but all operational truth is constrained to synthetic fixtures.
