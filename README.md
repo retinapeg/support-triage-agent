@@ -1,18 +1,40 @@
 # Support Triage Agent
 
-An interactive Technical Support Engineer simulation and an inspectable Python
-triage agent. Incoming API and webhook incidents build up in a live queue. The
-trainee accepts a case, talks to a synthetic customer, chooses one of five
-shuffled actions at each stage, runs fixture-backed diagnostics, and receives
-customer reactions, coaching, a score, and an evidence-based outcome.
+A tool-using triage agent for API and webhook support incidents, plus an
+interactive training simulator that uses the same synthetic diagnostic tools.
+Everything runs offline with no API key; OpenAI is optional.
 
-Optional **Live AI customer** mode uses OpenAI to generate fresh customer
-wording and react to the trainee's exact messages. The model can change the
-conversation, but it cannot change fixture-backed IDs, logs, HTTP statuses or
-the required resolution. The fully interactive scenario engine remains
-available offline with no credentials.
+- **Bounded tool loop.** At each step a decision adapter returns exactly one
+  `AgentDecision` (ask the customer, call a tool, resolve or escalate). It is a
+  strict Pydantic model: unknown fields are rejected and each action must carry
+  its required payload. Python then checks identifier arguments (request,
+  event and key IDs, HTTP codes) against values the customer or a successful
+  tool observation has supplied, runs an allow-listed tool, writes the
+  observation into `CaseState`, and escalates if the step budget (default 8)
+  runs out.
+- **Structured outputs.** The optional OpenAI adapter requests the same
+  `AgentDecision` schema through the Responses API
+  (`responses.parse(text_format=AgentDecision)`); the deterministic mock
+  adapter returns the same type, so both use one loop, one set of tools and one
+  set of stop rules.
+- **Training simulator.** A Streamlit support-shift console in which a person,
+  not the agent, works a live ticket queue against the same fixture-backed
+  tools, plus a lighter static browser showcase with three prebuilt scenarios.
 
-## Run the interactive simulation — recommended
+## Result: offline demo
+
+`python demo.py` runs three scenarios with the deterministic mock adapter:
+
+| Scenario | Outcome | Steps used |
+|---|---|---|
+| 1. Intermittent 401 authentication failures | Resolved after one round of clarifying questions: expired credential confirmed for the inspected request | 4 of 8 |
+| 2. Webhook "not firing"; endpoint returns 5xx | Resolved after one round of clarifying questions: event was sent, customer endpoint failed | 4 of 8 |
+| 3. Correlated API 500 and webhook failure | Escalated to engineering with a typed handoff; shared cause kept as a hypothesis | 5 of 8 |
+
+Two resolved, one escalated. These outcomes are asserted in
+`tests/test_agent.py`, and the full suite of 66 tests runs offline.
+
+## Quick start
 
 Requires Python 3.10 or newer.
 
@@ -20,10 +42,18 @@ Requires Python 3.10 or newer.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m streamlit run streamlit_app.py --server.port 8503
+
+python demo.py                 # autonomous agent, three scenarios (or --scenario 1|2|3)
+python -m pytest -q            # 66 tests, no network or API key
+python -m streamlit run streamlit_app.py --server.port 8503   # training simulator
+npm run dev                    # static browser showcase on port 4173, no install needed
 ```
 
-Open `http://127.0.0.1:8503`. The console starts with four incoming cases.
+## Training simulator (Streamlit)
+
+Run `python -m streamlit run streamlit_app.py --server.port 8503` and open
+`http://127.0.0.1:8503`. Incoming API and webhook incidents build up in a live
+queue; the console starts with four cases.
 Accept any ticket, then either select one of five possible support actions or
 write your own response in the chat box. Strong discovery reveals the exact
 synthetic identifiers required for diagnosis. The appropriate diagnostic
@@ -45,12 +75,17 @@ The interface is tailored to the core behaviours of a Technical Support Engineer
 - resolve a standard case only when diagnostic evidence supports it; and
 - give the next engineer a handoff that does not require discovery to start again.
 
+Optional **Live AI customer** mode uses OpenAI to generate fresh customer
+wording and react to the trainee's exact messages, again through structured
+Responses API output. The model can change the conversation, but it cannot
+change fixture-backed IDs, logs, HTTP statuses or the required resolution.
+
 ### Enable real AI customer interactions
 
 1. Start the app normally.
 2. In the sidebar, set **Customer engine** to **Live AI customer**.
-3. Paste your OpenAI API key into the password field in the local app—not into
-   source code, GitHub, a screenshot, or this chat.
+3. Paste your OpenAI API key into the password field in the local app, not into
+   source code, GitHub or a screenshot.
 4. Click **Generate AI incident**, accept it, and reply normally.
 
 The key is held only in the running Streamlit session and is not written to the
@@ -58,7 +93,7 @@ project. Live mode may incur API usage. Use synthetic content only.
 
 All scenarios, customers, identifiers and logs are synthetic. The project is not connected to any ticketing system, bank or live customer system.
 
-## Run the compact browser showcase
+## Browser showcase
 
 The repository also includes a credential-free web showcase for a quick
 walkthrough. It opens on a ticket menu with three prebuilt
@@ -72,22 +107,6 @@ Open `http://127.0.0.1:4173`. No package installation or API key is required.
 The browser showcase uses synthetic scenario data and transparent keyword
 scoring for typed replies; the Streamlit app above remains the full Python
 simulation with optional OpenAI customer interactions.
-
-## Command-line demo
-
-Run all three scenarios without the UI:
-
-```bash
-python demo.py
-```
-
-Run one scenario with `python demo.py --scenario 1`, `2`, or `3`.
-
-Run the complete test suite:
-
-```bash
-python -m pytest -q
-```
 
 ## What the project shows
 
@@ -197,13 +216,13 @@ export OPENAI_API_KEY="your-key"
 python demo.py --provider openai
 ```
 
-Do not commit API secrets or paste them into source code, GitHub, screenshots or
-chat. Hosted mode is nondeterministic, may incur usage, and is not needed for
+Do not commit API secrets or paste them into source code, GitHub or
+screenshots. Hosted mode is nondeterministic, may incur usage, and is not needed for
 the offline demo or the test suite.
 
 ## Tests
 
-The suite checks that:
+`python -m pytest -q` runs 66 tests offline. The suite checks that:
 
 - every tool returns a structured result;
 - all required HTTP and webhook fixtures are reachable;
@@ -213,7 +232,7 @@ The suite checks that:
 - unsupported resolutions and fabricated tool arguments are blocked;
 - an awaiting-customer case does not spin;
 - the maximum-step limit has no off-by-one call;
-- the 401 and webhook paths behave sensibly; and
+- the 401 and webhook paths behave sensibly;
 - escalation output satisfies the complete typed contract;
 - every active training stage presents exactly five choices and one strongest action;
 - safe choices progress discovery, diagnosis and response while unsafe choices do not;
