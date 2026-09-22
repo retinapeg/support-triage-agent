@@ -10,4 +10,4 @@ await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(source, output, { recursive: true });
 
-console.log(`Built recruiter showcase in ${output}`);
+console.log(`Built web showcase in ${output}`);

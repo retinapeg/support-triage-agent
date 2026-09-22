@@ -56,12 +56,12 @@ The interface is tailored to the core behaviours of a Technical Support Engineer
 The key is held only in the running Streamlit session and is not written to the
 project. Live mode may incur API usage. Use synthetic content only.
 
-The role framing is deliberate, but the product remains an independent synthetic portfolio demonstration. It is not connected to Alloy, Zendesk, a bank, or any live customer system.
+All scenarios, customers, identifiers and logs are synthetic. The project is not connected to any ticketing system, bank or live customer system.
 
 ## Run the compact browser showcase
 
-The repository also includes a credential-free web showcase designed for a
-quick portfolio walkthrough. It opens on a ticket menu with three prebuilt
+The repository also includes a credential-free web showcase for a quick
+walkthrough. It opens on a ticket menu with three prebuilt
 scenarios, then moves into the same discovery → diagnosis → resolution flow.
 
 ```bash
@@ -153,7 +153,7 @@ Mock mode and optional hosted-model mode use the same `AgentDecision`, tool, sta
 | `streamlit_app.py` | Interactive support-shift queue, customer chat, SLA, choices, evidence, and scorecard |
 | `tests/` | Behavioural and contract tests |
 
-The deliberately explicit loop is the main design choice: an interviewer can inspect the control flow without learning a large agent framework first.
+The deliberately explicit loop is the main design choice: a reader can inspect the control flow without learning a large agent framework first.
 
 ## Structured state and audit trail
 
@@ -199,7 +199,7 @@ python demo.py --provider openai
 
 Do not commit API secrets or paste them into source code, GitHub, screenshots or
 chat. Hosted mode is nondeterministic, may incur usage, and is not needed for
-the verified offline interview flow.
+the offline demo or the test suite.
 
 ## Tests
 
@@ -221,45 +221,11 @@ The suite checks that:
 - the live queue accepts and adds incidents without leaking case state; and
 - completed cases produce a scorecard and remain recorded in the shift history.
 
-## Interview explanation
+## Design decisions
 
-### 30 seconds
-
-> I built an interactive support-engineering simulator backed by a real triage agent. Incidents arrive in a live queue; I can talk to the customer or choose one of five actions, run fixture-backed diagnostics, and get scored on discovery, evidence use and escalation judgement. Optional OpenAI mode generates fresh customer wording and reacts to what I actually say, but it cannot invent logs or change the underlying case truth. The autonomous agent uses the same typed tools and evidence guardrails to reach an explicit resolution, clarification or engineering handoff.
-
-### 90 seconds
-
-> The project has two connected loops. In the training loop, a trainee accepts a timed incoming case, writes a customer message or chooses one of five shuffled actions, receives a customer reaction and coaching, runs the appropriate diagnostic, and progresses through discovery, diagnosis and response. In Live AI mode, the Responses API produces structured customer reactions and fresh incident phrasing. The prompt supplies the exact synthetic case truth, and Python keeps identifiers, logs, scores, tools and stage transitions outside the model.
->
-> Separately, the autonomous agent creates a Pydantic `CaseState` and repeatedly asks a replaceable decision adapter for exactly one action: ask, call a tool, resolve or escalate. Python validates identifier provenance, dispatches an allow-listed tool, records the observation and audit event, and supplies the updated state to the next decision. The model is a language and policy layer, never the source of operational truth. A resolution needs supporting evidence; conflicting or high-impact uncertainty becomes an engineering escalation. Production work would replace fixtures with authenticated adapters and add durable storage, tenant isolation, redaction, tracing, timeouts and human approval for consequential writes.
-
-## Three design decisions to defend
-
-1. **Keep the loop explicit.** The control flow and stop conditions are easy to read, debug, and test.
+1. **Keep the loop explicit.** The control flow and stop conditions are easy to read, debug and test. A graph framework such as LangGraph becomes useful when persistence, branching workflows or many integrations justify it; at this scope a hand-written loop needs fewer dependencies.
 2. **Use typed, replaceable boundaries.** Pydantic contracts constrain decisions and observations; provider choice does not leak into domain logic.
-3. **Make evidence discipline part of state.** Evidence, hypotheses, missing information, and actions cannot silently collapse into one plausible narrative.
-
-## Likely questions
-
-**Is the offline customer mode really interactive?**
-
-Yes: the trainee chooses or writes every action, the customer reacts, the score and mood change, diagnostics execute, and the case advances only when the current support objective is met. It is deterministic, however; use Live AI customer mode to demonstrate model-generated language and reactions.
-
-**Is deterministic mock mode really agentic?**
-
-The separate autonomous CLI loop proves repeated decisions, tool dispatch, observations, state transitions, and stopping. It does not prove hosted-model reasoning quality; that needs a labelled evaluation set.
-
-**Why not LangChain or LangGraph?**
-
-For this scope, the hand-written loop exposes more engineering understanding with fewer dependencies. A graph framework becomes useful when persistence, branching workflows, or many integrations justify it.
-
-**How does it reduce hallucination risk?**
-
-Operational facts come from customer input or tool observations, identifier arguments need provenance, hypotheses have their own field, and uncertainty can end in clarification or escalation.
-
-**What would productionisation require?**
-
-Authenticated adapters, durable event/case storage, tenant isolation, PII and secret redaction, timeouts and circuit breakers, tracing and metrics, evaluation gates, retention controls, and approval boundaries for writes.
+3. **Make evidence discipline part of state.** Evidence, hypotheses, missing information and actions cannot silently collapse into one plausible narrative.
 
 ## Limitations
 
@@ -269,6 +235,6 @@ Authenticated adapters, durable event/case storage, tenant isolation, PII and se
 - The visual UI is an in-memory training simulator, not a production ticketing or case-management system.
 - Live AI mode generates language and coaching, but all operational truth is constrained to synthetic fixtures.
 - The app has no durable user accounts, team scoring, real ticket ingestion, or authenticated production adapters.
-- This is a portfolio architecture, not a production security boundary.
+- This is a demonstration architecture, not a production security boundary.
 
 MIT licensed; see `LICENSE`.

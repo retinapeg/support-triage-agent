@@ -1,8 +1,8 @@
 """The explicit Support Triage Agent loop.
 
-Read this file first in an interview.  The model selects one action, Python
-validates and executes it, the observation is written to CaseState, and the
-updated state is presented to the model on the next iteration.
+The model selects one action, Python validates and executes it, the
+observation is written to CaseState, and the updated state is presented to the
+model on the next iteration.
 """
 
 from __future__ import annotations
