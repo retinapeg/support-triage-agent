@@ -125,7 +125,7 @@ new ticket every 20 seconds while the page is open. Every decision affects the
 support score and customer mood; wrong answers create realistic consequences
 without making the case unrecoverable.
 
-The interface is tailored to the core behaviours of a Technical Support Engineer **Triage & Discovery** workflow:
+The interface models the triage and discovery stage of a technical-support workflow: identify the customer, verify identifiers, act within tool bounds, escalate with evidence:
 
 - make the first response substantive rather than merely acknowledge the ticket;
 - gather the smallest useful set of identifiers, timestamps, impact and environment details;
