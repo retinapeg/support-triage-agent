@@ -1,4 +1,5 @@
 # Support Triage Agent
+[![tests](https://github.com/retinapeg/support-triage-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/retinapeg/support-triage-agent/actions/workflows/ci.yml)
 
 A tool-using triage agent for API and webhook support incidents, plus an
 interactive training simulator that uses the same synthetic diagnostic tools.
