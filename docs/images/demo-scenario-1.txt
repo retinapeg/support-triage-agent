@@ -1,0 +1,35 @@
+$ python demo.py --scenario 1
+
+========================================================================================
+SCENARIO 1: Intermittent 401 authentication failures
+========================================================================================
+Customer: Our API integration stopped working this morning. We are getting intermittent 401s in production.
+  step  0 | customer_input | customer evidence received
+  step  1 | decision       | A 401/403 cannot be tied to authentication evidence without a request or credential identifier.
+  step  1 | stop           | Required customer information is missing
+
+  Agent asks:
+    - Can you provide one failed request ID and its timestamp with timezone?
+    - What non-secret API key ID or credential label was used (do not send the secret)?
+    - Which environment is affected, and did the failure begin after a token or configuration change?
+
+  Customer replies: One failure was request req_401_expired at 2026-09-03T08:15:00Z. It used the non-secret key ID key_expired. Production checkout requests are failing for some users.
+  step  1 | customer_input | customer evidence received
+  step  2 | decision       | Validate the supplied non-secret credential identifier before inferring an authentication cause.
+  step  2 | tool_call      | check_authentication({"api_key_id": "key_expired"})
+  step  2 | tool_result    | check_authentication: Credential metadata found: status=expired, environment=production; secret material was not returned.
+  step  2 | state_update   | Case state now contains 1 confirmed evidence item(s), 1 request ID(s), 0 event ID(s), and 1 HTTP status code(s).
+  step  3 | decision       | Correlate the customer report with the actual request outcome.
+  step  3 | tool_call      | inspect_api_request({"request_id": "req_401_expired"})
+  step  3 | tool_result    | inspect_api_request: Found GET /v1/evaluations/ev_demo_4821: HTTP 401 (rejected).
+  step  3 | state_update   | Case state now contains 2 confirmed evidence item(s), 1 request ID(s), 0 event ID(s), and 1 HTTP status code(s).
+  step  4 | decision       | Authentication and request evidence identify a concrete credential condition.
+  step  4 | stop           | Evidence-supported resolution produced
+
+  FINAL CASE STATE
+    case_id:   case_b92a4d14706b
+    category:  authentication
+    severity:  high
+    status:    resolved
+    steps:     4/8
+    resolution: Confirmed for the inspected sample: expired. Recommended action: issue a new credential or token and retry the failed operation. This explains the inspected failure but does not prove every intermittent failure has the same cause; compare additional failing and successful request IDs if the pattern continues. The agent has not claimed the customer already made this change.

@@ -24,6 +24,62 @@ scenarios and escalates the third to engineering
   not the agent, works a live ticket queue against the same fixture-backed
   tools, plus a lighter static browser showcase with three prebuilt scenarios.
 
+![Terminal output of python demo.py --scenario 1: the agent asks for a request ID and key ID, calls check_authentication and inspect_api_request, and resolves the 401 case in 4 of 8 steps](docs/images/demo-scenario-1.png)
+
+*Captured run of `python demo.py --scenario 1` in the default mock mode with no API key (raw output in [`docs/images/demo-scenario-1.txt`](docs/images/demo-scenario-1.txt)). It is scenario 1 of the three summarised below; the customer, identifiers and logs are synthetic fixtures.*
+
+## System architecture
+
+![Architecture diagram: demo.py feeds the agent.py bounded loop, which swaps state and AgentDecision with the default mock adapter or an optional OpenAI adapter, stores evidence in CaseState, calls allow-listed tools over synthetic fixtures and ends by asking the customer, resolving or escalating. In the Streamlit simulator a human trainee drives the same tools, with an optional OpenAI-played customer. Pytest covers both paths offline.](docs/images/architecture.svg)
+
+*Purple: model call · blue: deterministic code · green: human · amber: evaluation · grey: storage · dashed: external, optional, mocked or planned*
+
+`python demo.py` passes each synthetic issue and its scripted customer
+follow-ups to the bounded loop in `agent.py`. At each step the loop gives a copy
+of `CaseState` to a decision adapter (the rule-based mock by default, OpenAI
+only when selected and given a key), checks the returned `AgentDecision`
+against identifier-provenance and evidence rules, runs one allow-listed tool
+from `tools.py` and writes the observation back to `CaseState`. It stops when
+it asks the customer, resolves, escalates or reaches the 8-step budget. The
+Streamlit simulator does not use this loop: a human trainee chooses actions or
+types replies, `simulation.py` scores them and calls the same fixture-backed
+tools, and the customer is scripted unless Live AI customer mode is on. The
+static browser showcase in `web/` is a separate JavaScript demo with its own
+scenario data and is not shown; [Architecture](#architecture) maps each file.
+
+## How AI is used
+
+- **Default path: no model call.** `python demo.py`, the test suite and the
+  Streamlit "Scenario engine" make no model calls. `MockDecisionAdapter` is a
+  rule-based stand-in that returns the same `AgentDecision` type as the model
+  adapter, and the scripted customer uses fixed replies and keyword checks.
+- **Optional decision model.** `python demo.py --provider openai` uses
+  `OpenAIResponsesAdapter` (`OPENAI_API_KEY`; model from `OPENAI_MODEL`,
+  default `gpt-5.4-mini`) through `responses.parse(text_format=AgentDecision)`.
+  It sees `CaseState` without the audit trail, the six diagnostic tool schemas
+  and the remaining step count, and returns one action: ask, call a tool,
+  resolve or escalate. It does not run tools itself.
+- **Optional customer model.** In Live AI customer mode, `generate_live_case`
+  rewrites names and wording of a fixture case, and `OpenAICustomerSimulator`
+  gets the case facts, the last eight messages, the trainee's message and the
+  observed tool results. It returns a structured `CustomerEvaluation`: for a
+  clicked choice only its reply is used, while for a typed reply its coaching,
+  score change and advance flag are applied too. The key is entered in the
+  sidebar and held only in the Streamlit session.
+- **What stays deterministic.** Python checks that tool arguments match
+  identifiers already seen, runs only allow-listed tools over synthetic
+  fixtures, rejects resolutions without supporting evidence, builds the
+  escalation and enforces the step budget. In the simulator only Python runs
+  diagnostics, and a typed reply cannot move a case past diagnosis or response
+  without a successful tool result. See
+  [Trust boundaries and guardrails](#trust-boundaries-and-guardrails).
+- **Evaluation and fallbacks.** The 66 offline tests use the mock adapter,
+  scripted sequence adapters and Streamlit `AppTest`; the OpenAI paths are not
+  tested and no live-model results are reported (see
+  [Limitations](#limitations)). If the decision adapter raises, the error is
+  audited and the case is escalated; if the escalation tool fails, a fallback
+  escalation lists the unknowns.
+
 ## Result: offline demo
 
 `python demo.py` runs three scenarios with the deterministic mock adapter:
